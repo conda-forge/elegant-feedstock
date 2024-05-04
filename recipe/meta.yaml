@@ -25,7 +25,7 @@ source:
 build:
   skip: true  # [win]
   skip: true  # [py<310]
-  number: 0
+  number: 1
   ignore_run_exports:
     # libsz/libaec used in hdf2sdds/sdds2hdf:
     - libaec
@@ -37,6 +37,7 @@ build:
 requirements:
   build:
     - {{ compiler("c") }}
+    - {{ stdlib("c") }}
     - {{ compiler("cxx") }}
     - {{ compiler("fortran") }}
     - mpich
