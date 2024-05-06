@@ -72,12 +72,10 @@ MAKE_MPI_ARGS=(
   "MPICH_CXX=$CXX"
 )
 
-PYTHON_VERSION="$PY_VER"
-
 echo "* Make args:          ${MAKE_ALL_ARGS[*]}"
 echo "* Make GSL args:      ${MAKE_GSL_ARGS[*]}"
 echo "* Make MPI args:      ${MAKE_MPI_ARGS[*]}"
-echo "* Python version:     $PYTHON_VERSION"
+echo "* Python version:     $PY_VER"
 
 echo "* Setting compilers for epics-base"
 
@@ -174,7 +172,7 @@ make -C "${SRC_DIR}/epics/extensions/src/SDDS/python" \
   PYTHON_EXEC_PREFIX="$PREFIX" \
   PYTHON_VERSION="$PY_VER" \
   LIB_LIBS="SDDS1 rpnlib mdblib mdbmth" \
-  USR_SYS_LIBS="python${PYTHON_VERSION} lzma"
+  USR_SYS_LIBS="python${PY_VER} lzma"
 
 echo "* Adding extension bin directory to PATH for nlpp"
 export PATH="${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}:$PATH"
