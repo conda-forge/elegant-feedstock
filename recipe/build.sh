@@ -27,22 +27,6 @@ fi
 echo "* Work root:    $SRC_DIR"
 echo "* Conda prefix: $PREFIX"
 
-echo "* Removing vendored libraries"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/png"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/gd"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/lzma"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/tiff"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/zlib"
-
-echo "* Patching Makefiles to not use vendored libraries"
-# The build system will try to use these regardless of our settings:
-sed -i -e '/^DIRS += zlib lzma$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-sed -i -e '/^DIRS += png$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-sed -i -e '/^DIRS += gd$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-sed -i -e '/^DIRS += tiff$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-# This will also force it to use the vendored zlib:
-sed -i -e '/^mdblib_DEPEND_DIRS = zlib$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-
 echo "* Patching EPICS_BASE path for oag"
 # shellcheck disable=SC2016
 sed -i -e 's@^#\s*EPICS_BASE.*@EPICS_BASE=$(TOP)/../../epics/base@' "${SRC_DIR}/oag/apps/configure/RELEASE"
@@ -102,9 +86,13 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
     "$SRC_DIR/epics/extensions/src/SDDS/SDDSaps/Makefile"
   # shellcheck disable=SC2154
   if [[ "$host_alias" != "$build_alias" ]]; then
+    # NOTE: we are doing this specifically before the vendored libraries are removed.
+    # Otherwise, we'll need to install lzma for darwin-x86_64.  This `nlpp` binary
+    # and related x86-64 libraries will *not* be included in the conda package.
     echo "* Building essential tools on the host for cross-compilation (specifically: nlpp)"
     for path in \
       "${SRC_DIR}/epics/base" \
+      "${SRC_DIR}/epics/extensions/src/SDDS/lzma" \
       "${SRC_DIR}/epics/extensions/src/SDDS/mdblib" \
       "${SRC_DIR}/epics/extensions/src/SDDS/namelist" \
     ; do
@@ -145,6 +133,22 @@ OP_SYS_INCLUDES += -I${PREFIX}/include
 EOF
   
 fi
+
+echo "* Removing vendored libraries for the target build"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/png"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/gd"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/lzma"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/tiff"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/zlib"
+
+echo "* Patching Makefiles to not use vendored libraries"
+# The build system will try to use these regardless of our settings:
+sed -i -e '/^DIRS += zlib lzma$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
+sed -i -e '/^DIRS += png$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
+sed -i -e '/^DIRS += gd$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
+sed -i -e '/^DIRS += tiff$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
+# This will also force it to use the vendored zlib:
+sed -i -e '/^mdblib_DEPEND_DIRS = zlib$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
 
 echo "* Configuring EPICS for all architectures"
 
