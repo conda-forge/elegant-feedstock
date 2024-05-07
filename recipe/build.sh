@@ -3,7 +3,7 @@
 set -ex -o pipefail
 
 # Remove static libraries from the prefix to prevent static linking
-rm $PREFIX/lib/*.a
+rm "$PREFIX/lib/"*.a
 
 mkdir oag
 mkdir epics
@@ -48,17 +48,11 @@ echo "* Patching EPICS_BASE path for oag"
 sed -i -e 's@^#\s*EPICS_BASE.*@EPICS_BASE=$(TOP)/../../epics/base@' "${SRC_DIR}/oag/apps/configure/RELEASE"
 
 EPICS_HOST_ARCH=$("${SRC_DIR}"/epics/base/startup/EpicsHostArch)
+EPICS_TARGET_ARCH="${EPICS_HOST_ARCH}"
 echo "* EPICS_HOST_ARCH=${EPICS_HOST_ARCH}"
 
 MAKE_ALL_ARGS=(
-  "HDF_LIB_LOCATION=$PREFIX/lib"
-  "EPICS_HOST_ARCH=$EPICS_HOST_ARCH"
   "SVN_VERSION=$PKG_VERSION"
-  "zlib_DIR=$PREFIX/lib"
-  "lzma_DIR=$PREFIX/lib"
-  "png_DIR=$PREFIX/lib"
-  "gd_DIR=$PREFIX/lib"
-  "tiff_DIR=$PREFIX/lib"
 )
 MAKE_GSL_ARGS=(
   "GSL=1"
@@ -77,20 +71,13 @@ echo "* Make GSL args:      ${MAKE_GSL_ARGS[*]}"
 echo "* Make MPI args:      ${MAKE_MPI_ARGS[*]}"
 echo "* Python version:     $PY_VER"
 
-echo "* Setting compilers for epics-base"
+echo "* Configuring EPICS for ${EPICS_HOST_ARCH}"
 
 cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
-CC=$CC
-CCC=$CXX
-
-COMMANDLINE_LIBRARY=
-LINKER_USE_RPATH=NO
-
-USR_INCLUDES+= -I $PREFIX/include
-USR_LDFLAGS=$LDFLAGS
-HDF_LIB_LOCATION=$PREFIX/lib
-USER_MPI_FLAGS="-DUSE_MPI=1 -DSDDS_MPI_IO=1 -I${PREFIX}/include"
+CC=${CC_FOR_BUILD}
+CCC=${CXX_FOR_BUILD}
 EOF
+
 
 if [[ $(uname -s) == 'Linux' ]]; then
   cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
@@ -113,13 +100,107 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
     "$SRC_DIR/epics/extensions/src/SDDS/Makefile"
   sed -i -e "s/^DIRS =.*/DIRS = sddsplots/" \
     "$SRC_DIR/epics/extensions/src/SDDS/SDDSaps/Makefile"
+  # shellcheck disable=SC2154
+  if [[ "$host_alias" != "$build_alias" ]]; then
+    echo "* Building essential tools on the host for cross-compilation (specifically: nlpp)"
+    for path in \
+      "${SRC_DIR}/epics/base" \
+      "${SRC_DIR}/epics/extensions/src/SDDS/mdblib" \
+      "${SRC_DIR}/epics/extensions/src/SDDS/namelist" \
+    ; do
+      echo "* Building $path"
+      make -C "$path" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}"
+    done
+    ls -l "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/"
+    if [ ! -f "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/nlpp" ]; then
+      echo "* nlpp not built for the host; unable to continue"
+      exit 1
+    fi
+    EPICS_TARGET_ARCH="darwin-aarch64"
+
+    echo "* Patching mpicc and mpicxx to allow for cross-compilation to ARM64"
+    # NOTE: mpicc/mpicxx include *build environment* libraries by default
+    # in ldflags, which trips up the linker since it finds the x86-64
+    # versions *before* the ARM64 ones.
+    echo "* Before patch:"
+    grep -e "^final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")"
+    sed -i '' \
+      's/^final_ldflags=".*$/final_ldflags=""/' \
+      "$(readlink -f "$(which mpicc)")" \
+      "$(readlink -f "$(which mpicxx)")"
+    echo "* After patch:"
+    grep -e "final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")"
+
+  fi
   # oag overwrites USR_CFLAGS; append to the arch-specific ones here instead
   # to avoid warnings which have become fatal errors:
-  cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
+  cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.darwinCommon.darwinCommon"
 USR_CFLAGS_Darwin += -Wno-error=incompatible-function-pointer-types
 USR_CXXFLAGS_Darwin += -Wno-error=register
+
+OP_SYS_CFLAGS += -isysroot \${CONDA_BUILD_SYSROOT} -mmacosx-version-min=\${MACOSX_DEPLOYMENT_TARGET}
+OP_SYS_CXXFLAGS += -isysroot \${CONDA_BUILD_SYSROOT} -mmacosx-version-min=\${MACOSX_DEPLOYMENT_TARGET}
+OP_SYS_LDFLAGS += -Wl,-rpath,${PREFIX}/lib -L${PREFIX}/lib
+OP_SYS_INCLUDES += -I${PREFIX}/include
 EOF
+  
 fi
+
+echo "* Configuring EPICS for all architectures"
+
+cat <<EOF >> "${SRC_DIR}/epics/base/configure/CONFIG_SITE"
+COMMANDLINE_LIBRARY=
+LINKER_USE_RPATH=NO
+
+USR_INCLUDES+= -I $PREFIX/include
+USR_LDFLAGS=$LDFLAGS
+USER_MPI_FLAGS="-DUSE_MPI=1 -DSDDS_MPI_IO=1 -I${PREFIX}/include"
+
+override HDF_LIB_LOCATION=$PREFIX/lib
+override SVN_VERSION=$PKG_VERSION
+override zlib_DIR=$PREFIX/lib
+override lzma_DIR=$PREFIX/lib
+override png_DIR=$PREFIX/lib
+override gd_DIR=$PREFIX/lib
+override tiff_DIR=$PREFIX/lib
+EOF
+
+cat <<EOF >> "${SRC_DIR}/epics/extensions/configure/CONFIG_SITE"
+COMMANDLINE_LIBRARY=
+LINKER_USE_RPATH=NO
+
+USR_INCLUDES+= -I $PREFIX/include
+USR_LDFLAGS=$LDFLAGS
+USER_MPI_FLAGS="-DUSE_MPI=1 -DSDDS_MPI_IO=1 -I${PREFIX}/include"
+
+override HDF_LIB_LOCATION=$PREFIX/lib
+override SVN_VERSION=$PKG_VERSION
+override zlib_DIR=$PREFIX/lib
+override lzma_DIR=$PREFIX/lib
+override png_DIR=$PREFIX/lib
+override gd_DIR=$PREFIX/lib
+override tiff_DIR=$PREFIX/lib
+EOF
+
+# For cross-compilation, we are going to fake the host architecture to avoid
+# building elegant twice - we don't have all of the dependencies for both
+# architectures.
+#
+# We should just need some basic tools like nlpp built
+# for the host architecture be cross-compile elegant for the target
+# architecture.
+#
+# Future, maybe: CROSS_COMPILER_TARGET_ARCHS
+MAKE_ALL_ARGS+=( "EPICS_HOST_ARCH=$EPICS_TARGET_ARCH" )
+echo "* EPICS_TARGET_ARCH=${EPICS_TARGET_ARCH}"
+
+cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_TARGET_ARCH}"
+CC=$CC
+CCC=$CXX
+AR=$AR -rc
+LD=$LD
+RANLIB=$RANLIB
+EOF
 
 # APS may have this patched locally; these were changed long before 1.12.1
 # which they reportedly use:
@@ -136,16 +217,15 @@ sed -i -e 's/^epicsShareFuncFDLIBM //g' "${SRC_DIR}/epics/extensions/src/SDDS/in
 echo -e "all:\ninstall:\nclean:\n" > "${SRC_DIR}/epics/extensions/src/SDDS/SDDSaps/sddsplots/motifDriver/Makefile"
 
 echo "* Setting up EPICS build system"
-make -C "${SRC_DIR}/epics/base"
+make -C "${SRC_DIR}/epics/base" "${MAKE_ALL_ARGS[@]}"
 
-echo "* Patching SDDS utils"
 echo "* Building SDDS"
 # First, build some non-MPI things (otherwise we don't get editstring, nlpp)
 make -C "${SRC_DIR}/epics/extensions/src/SDDS" "${MAKE_ALL_ARGS[@]}"
 
 # Clean out the artifacts from the non-MPI build and then build with MPI:
 echo "* Cleaning non-MPI build"
-make -C "${SRC_DIR}/epics/extensions/src/SDDS" clean
+make -C "${SRC_DIR}/epics/extensions/src/SDDS" "${MAKE_ALL_ARGS[@]}" clean
 
 echo "* Building SDDSlib with MPI"
 make -C "${SRC_DIR}/epics/extensions/src/SDDS/SDDSlib" "${MAKE_MPI_ARGS[@]}" "${MAKE_ALL_ARGS[@]}"
@@ -160,7 +240,7 @@ for sdds_part in \
   cmatlib    \
 ; do
   echo "* Building SDDS $sdds_part"
-  make -C "${SRC_DIR}/epics/extensions/src/SDDS/${sdds_part}" "${MAKE_MPI_ARGS[@]}"
+  make -C "${SRC_DIR}/epics/extensions/src/SDDS/${sdds_part}" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}"
 done
 
 echo "* Building SDDS python"
@@ -218,16 +298,16 @@ make -C "${ELEGANT_ROOT}/sddsbrightness" \
 echo "* Build succeeded"
 
 echo "* Making binaries writeable so patchelf/install_name_tool will work"
-chmod +w "${SRC_DIR}/oag/apps/bin/${EPICS_HOST_ARCH}/"*
-chmod +w "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/"*
-chmod +w "${SRC_DIR}/epics/extensions/lib/${EPICS_HOST_ARCH}/"*
+chmod +w "${SRC_DIR}/oag/apps/bin/${EPICS_TARGET_ARCH}/"*
+chmod +w "${SRC_DIR}/epics/extensions/bin/${EPICS_TARGET_ARCH}/"*
+chmod +w "${SRC_DIR}/epics/extensions/lib/${EPICS_TARGET_ARCH}/"*
 
 SITE_PACKAGES_DIR="$PREFIX/lib/python${PY_VER}/site-packages"
 
 echo "* Installing sdds library to $SITE_PACKAGES_DIR"
 cp "${SRC_DIR}/epics/extensions/src/SDDS/python/sdds.py" "$SITE_PACKAGES_DIR"
-cp "${SRC_DIR}/epics/extensions/lib/${EPICS_HOST_ARCH}/sddsdata."* "$SITE_PACKAGES_DIR/sddsdata.so"
+cp "${SRC_DIR}/epics/extensions/lib/${EPICS_TARGET_ARCH}/sddsdata."* "$SITE_PACKAGES_DIR/sddsdata.so"
 
 echo "* Installing binaries to $PREFIX"
-cp "${SRC_DIR}/oag/apps/bin/${EPICS_HOST_ARCH}/"* "${PREFIX}/bin"
-cp "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/"* "${PREFIX}/bin"
+cp "${SRC_DIR}/oag/apps/bin/${EPICS_TARGET_ARCH}/"* "${PREFIX}/bin"
+cp "${SRC_DIR}/epics/extensions/bin/${EPICS_TARGET_ARCH}/"* "${PREFIX}/bin"
