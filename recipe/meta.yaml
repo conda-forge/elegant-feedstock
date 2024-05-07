@@ -42,6 +42,7 @@ requirements:
     - {{ compiler("fortran") }}
     - mpich
     - make
+    - python
   host:
     - blas * *openblas
     - libopenblas

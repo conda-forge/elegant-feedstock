@@ -86,6 +86,9 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
     "$SRC_DIR/epics/extensions/src/SDDS/SDDSaps/Makefile"
   # shellcheck disable=SC2154
   if [[ "$host_alias" != "$build_alias" ]]; then
+    echo "* Making sure Python is available for the build machine"
+    python -c "print('Python is available')" || exit 1
+
     # NOTE: we are doing this specifically before the vendored libraries are removed.
     # Otherwise, we'll need to install lzma for darwin-x86_64.  This `nlpp` binary
     # and related x86-64 libraries will *not* be included in the conda package.
