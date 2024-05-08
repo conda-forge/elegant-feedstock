@@ -25,7 +25,7 @@ source:
 build:
   skip: true  # [win]
   skip: true  # [py<310]
-  number: 1
+  number: 2
   ignore_run_exports:
     # libsz/libaec used in hdf2sdds/sdds2hdf:
     - libaec
@@ -42,6 +42,7 @@ requirements:
     - {{ compiler("fortran") }}
     - mpich
     - make
+    - python
   host:
     - blas * *openblas
     - libopenblas
