@@ -31,7 +31,7 @@ build:
   # `elegant * mpi_*` for any mpi
   string: "mpi_{{ mpi }}_h{{ PKG_HASH }}_{{ build }}"
   run_exports:
-    - {{ name }} * {{ mpi_prefix }}_*
+    - {{ name }} * mpi_{{ mpi }}_*
   ignore_run_exports:
     # libsz/libaec used in hdf2sdds/sdds2hdf:
     - libaec
