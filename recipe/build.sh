@@ -109,19 +109,20 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
     fi
     EPICS_TARGET_ARCH="darwin-aarch64"
 
-    echo "* Patching mpicc and mpicxx to allow for cross-compilation to ARM64"
-    # NOTE: mpicc/mpicxx include *build environment* libraries by default
-    # in ldflags, which trips up the linker since it finds the x86-64
-    # versions *before* the ARM64 ones.
-    echo "* Before patch:"
-    grep -e "^final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")"
-    sed -i '' \
-      's/^final_ldflags=".*$/final_ldflags=""/' \
-      "$(readlink -f "$(which mpicc)")" \
-      "$(readlink -f "$(which mpicxx)")"
-    echo "* After patch:"
-    grep -e "final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")"
-
+    if [[ "${mpi}" == "mpich" ]]; then
+      echo "* Patching mpicc and mpicxx to allow for cross-compilation to ARM64"
+      # NOTE: mpicc/mpicxx include *build environment* libraries by default
+      # in ldflags, which trips up the linker since it finds the x86-64
+      # versions *before* the ARM64 ones.
+      echo "* Before patch:"
+      grep -e "^final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")"
+      sed -i '' \
+        's/^final_ldflags=".*$/final_ldflags=""/' \
+        "$(readlink -f "$(which mpicc)")" \
+        "$(readlink -f "$(which mpicxx)")"
+      echo "* After patch:"
+      grep -e "final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")"
+    fi
   fi
   # oag overwrites USR_CFLAGS; append to the arch-specific ones here instead
   # to avoid warnings which have become fatal errors:
