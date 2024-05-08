@@ -77,6 +77,11 @@ test:
     - sdds
     - sddsdata
   commands:
+    # Set up for OpenMPI testing:
+    - export OMPI_MCA_plm=isolated                          # [mpi == "openmpi"]
+    - export OMPI_MCA_btl_vader_single_copy_mechanism=none  # [mpi == "openmpi"]
+    - export OMPI_MCA_rmaps_base_oversubscribe=yes          # [mpi == "openmpi"]
+    # Check that Elegant is executable:
     - test -f $PREFIX/bin/Pelegant  # [unix]
     - Pelegant
     - test -f $PREFIX/bin/elegant  # [unix]
