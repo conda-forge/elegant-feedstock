@@ -1,5 +1,6 @@
 {% set name = "elegant" %}
 {% set version = "2023.3.0" %}
+{% set build = 3 %}
 
 package:
   name: {{ name|lower }}
@@ -25,7 +26,12 @@ source:
 build:
   skip: true  # [win]
   skip: true  # [py<310]
-  number: 2
+  number: {{ build }}
+  # `elegant * mpi_mpich_*` for mpich
+  # `elegant * mpi_*` for any mpi
+  string: "mpi_{{ mpi }}_h{{ PKG_HASH }}_{{ build }}"
+  run_exports:
+    - {{ name }} * mpi_{{ mpi }}_*
   ignore_run_exports:
     # libsz/libaec used in hdf2sdds/sdds2hdf:
     - libaec
@@ -40,7 +46,7 @@ requirements:
     - {{ stdlib("c") }}
     - {{ compiler("cxx") }}
     - {{ compiler("fortran") }}
-    - mpich
+    - {{ mpi }}
     - make
     - python
   host:
@@ -48,16 +54,15 @@ requirements:
     - libopenblas
     - libblas * *openblas  # [linux]
     - liblapack * *openblas  # [linux]
-    - fftw * mpi_mpich_*
+    - fftw * mpi_{{ mpi }}_*
     - gsl
-    - hdf5 * mpi_mpich_*
+    - hdf5 * mpi_{{ mpi }}_*
     - libaec
     - libgd
     - libgomp  # [linux]
     - libpng
     - libtiff
-    - mpi * mpich*
-    - mpich
+    - {{ mpi }}
     - ncurses
     - python
     - xz
@@ -65,12 +70,18 @@ requirements:
     - zstd  # [osx]
   run:
     - python
+    - {{ mpi }}
 
 test:
   imports:
     - sdds
     - sddsdata
   commands:
+    # Set up for OpenMPI testing:
+    - export OMPI_MCA_plm=isolated                          # [mpi == "openmpi"]
+    - export OMPI_MCA_btl_vader_single_copy_mechanism=none  # [mpi == "openmpi"]
+    - export OMPI_MCA_rmaps_base_oversubscribe=yes          # [mpi == "openmpi"]
+    # Check that Elegant is executable:
     - test -f $PREFIX/bin/Pelegant  # [unix]
     - Pelegant
     - test -f $PREFIX/bin/elegant  # [unix]
