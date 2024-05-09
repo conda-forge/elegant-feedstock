@@ -1,6 +1,6 @@
 {% set name = "elegant" %}
 {% set version = "2023.4.0" %}
-{% set build = 1 %}
+{% set build = 2 %}
 
 package:
   name: {{ name|lower }}
@@ -29,7 +29,7 @@ build:
   number: {{ build }}
   # `elegant * mpi_mpich_*` for mpich
   # `elegant * mpi_*` for any mpi
-  string: "mpi_{{ mpi }}_h{{ PKG_HASH }}_{{ build }}"
+  string: "mpi_{{ mpi }}_py{{ py }}h{{ PKG_HASH }}_{{ build }}"
   run_exports:
     - {{ name }} * mpi_{{ mpi }}_*
   ignore_run_exports:
