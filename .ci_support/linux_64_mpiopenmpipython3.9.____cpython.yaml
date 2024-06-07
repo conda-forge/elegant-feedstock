@@ -39,7 +39,7 @@ mpich:
 ncurses:
 - '6'
 openmpi:
-- '4'
+- '5'
 pin_run_as_build:
   python:
     min_pin: x.x
@@ -57,4 +57,4 @@ zip_keys:
 - - c_stdlib_version
   - cdt_name
 zlib:
-- '1.2'
+- '1'
