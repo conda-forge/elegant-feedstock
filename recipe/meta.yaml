@@ -49,6 +49,7 @@ requirements:
     - {{ mpi }}
     - make
     - python
+    - libxcrypt  # [py>=313 and linux]
   host:
     - blas * *openblas
     - libopenblas
