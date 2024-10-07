@@ -32,9 +32,8 @@ echo "* Patching EPICS_BASE path for oag"
 sed -i -e 's@^#\s*EPICS_BASE.*@EPICS_BASE=$(TOP)/../../epics/base@' "${SRC_DIR}/oag/apps/configure/RELEASE"
 
 echo "* Add missing header file to fix implicit function calls"
-ls -l "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/
-ls -l "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/cm_test.c
-sed -i '1s/^/#include <stdio.h>\n/' "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/cm_test.c
+sed -i -e '1s/^/#include <stdio.h>\n/' "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/cm_test.c
+sed -i -e 's/gets(s)/fgets(s, sizeof(s), stdin)/' "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/cm_test.c
 
 EPICS_HOST_ARCH=$("${SRC_DIR}"/epics/base/startup/EpicsHostArch)
 EPICS_TARGET_ARCH="${EPICS_HOST_ARCH}"
