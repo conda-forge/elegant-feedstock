@@ -31,8 +31,10 @@ echo "* Patching EPICS_BASE path for oag"
 # shellcheck disable=SC2016
 sed -i -e 's@^#\s*EPICS_BASE.*@EPICS_BASE=$(TOP)/../../epics/base@' "${SRC_DIR}/oag/apps/configure/RELEASE"
 
-echo "* Updating 'gets' references removed in C11"
-sed -i '1i #include <stdio.h>' "${SRC_DIR}/epics/extensions/src/SDDS/cmatlib/cm_test.c"
+echo "* Add missing header file to fix implicit function calls"
+ls -l "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/
+ls -l "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/cm_test.c
+sed -i '1s/^/#include <stdio.h>\n/' "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/cm_test.c
 
 EPICS_HOST_ARCH=$("${SRC_DIR}"/epics/base/startup/EpicsHostArch)
 EPICS_TARGET_ARCH="${EPICS_HOST_ARCH}"
