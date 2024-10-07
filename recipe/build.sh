@@ -33,7 +33,6 @@ sed -i -e 's@^#\s*EPICS_BASE.*@EPICS_BASE=$(TOP)/../../epics/base@' "${SRC_DIR}/
 
 echo "* Updating 'gets' references removed in C11"
 sed -i '1i #include <stdio.h>' "${SRC_DIR}/epics/extensions/src/SDDS/cmatlib/cm_test.c"
-sed -i -e 's/gets/fgets/' "${SRC_DIR}/epics/extensions/src/SDDS/cmatlib/cm_test.c"
 
 EPICS_HOST_ARCH=$("${SRC_DIR}"/epics/base/startup/EpicsHostArch)
 EPICS_TARGET_ARCH="${EPICS_HOST_ARCH}"
