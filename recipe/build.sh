@@ -31,6 +31,10 @@ echo "* Patching EPICS_BASE path for oag"
 # shellcheck disable=SC2016
 sed -i -e 's@^#\s*EPICS_BASE.*@EPICS_BASE=$(TOP)/../../epics/base@' "${SRC_DIR}/oag/apps/configure/RELEASE"
 
+echo "* Updating 'gets' references removed in C11"
+sed -i '1i #include <stdio.h>' "${SRC_DIR}/epics/extensions/src/SDDS/cmatlib/cm_test.c"
+sed -i -e 's/gets/fgets/' "${SRC_DIR}/epics/extensions/src/SDDS/cmatlib/cm_test.c"
+
 EPICS_HOST_ARCH=$("${SRC_DIR}"/epics/base/startup/EpicsHostArch)
 EPICS_TARGET_ARCH="${EPICS_HOST_ARCH}"
 echo "* EPICS_HOST_ARCH=${EPICS_HOST_ARCH}"
@@ -57,14 +61,13 @@ echo "* Python version:     $PY_VER"
 
 echo "* Configuring EPICS for ${EPICS_HOST_ARCH}"
 
-cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
+cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
 CC=${CC_FOR_BUILD}
 CCC=${CXX_FOR_BUILD}
 EOF
 
-
 if [[ $(uname -s) == 'Linux' ]]; then
-  cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
+  cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
 USR_LDFLAGS+= -Wl,--disable-new-dtags -Wl,-rpath-link,${PREFIX}/lib
 EOF
   # On Linux, ensure libgomp is included during linking:
@@ -79,7 +82,7 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
   # Outside of conda-forge infrastructure with a modern MacOS SDK, these build
   # without issue. The older MacOS SDK that conda-forge uses has issues with
   # pseudoInverse and lapack/blas.
-  MAKE_ALL_ARGS+=( "BUILD_PSEUDOINVERSE=0" )
+  MAKE_ALL_ARGS+=("BUILD_PSEUDOINVERSE=0")
   sed -i -e "s#^DIRS += SDDSaps/sddscontours##" \
     "$SRC_DIR/epics/extensions/src/SDDS/Makefile"
   sed -i -e "s/^DIRS =.*/DIRS = sddsplots/" \
@@ -97,8 +100,7 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
       "${SRC_DIR}/epics/base" \
       "${SRC_DIR}/epics/extensions/src/SDDS/lzma" \
       "${SRC_DIR}/epics/extensions/src/SDDS/mdblib" \
-      "${SRC_DIR}/epics/extensions/src/SDDS/namelist" \
-    ; do
+      "${SRC_DIR}/epics/extensions/src/SDDS/namelist"; do
       echo "* Building $path"
       make -C "$path" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}"
     done
@@ -126,7 +128,7 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
   fi
   # oag overwrites USR_CFLAGS; append to the arch-specific ones here instead
   # to avoid warnings which have become fatal errors:
-  cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.darwinCommon.darwinCommon"
+  cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.darwinCommon.darwinCommon"
 USR_CFLAGS_Darwin += -Wno-error=incompatible-function-pointer-types
 USR_CXXFLAGS_Darwin += -Wno-error=register
 
@@ -135,7 +137,7 @@ OP_SYS_CXXFLAGS += -isysroot \${CONDA_BUILD_SYSROOT} -mmacosx-version-min=\${MAC
 OP_SYS_LDFLAGS += -Wl,-rpath,${PREFIX}/lib -L${PREFIX}/lib
 OP_SYS_INCLUDES += -I${PREFIX}/include
 EOF
-  
+
 fi
 
 echo "* Removing vendored libraries for the target build"
@@ -156,7 +158,7 @@ sed -i -e '/^mdblib_DEPEND_DIRS = zlib$/d' "${SRC_DIR}/epics/extensions/src/SDDS
 
 echo "* Configuring EPICS for all architectures"
 
-cat <<EOF >> "${SRC_DIR}/epics/base/configure/CONFIG_SITE"
+cat <<EOF >>"${SRC_DIR}/epics/base/configure/CONFIG_SITE"
 COMMANDLINE_LIBRARY=
 LINKER_USE_RPATH=NO
 
@@ -173,7 +175,7 @@ override gd_DIR=$PREFIX/lib
 override tiff_DIR=$PREFIX/lib
 EOF
 
-cat <<EOF >> "${SRC_DIR}/epics/extensions/configure/CONFIG_SITE"
+cat <<EOF >>"${SRC_DIR}/epics/extensions/configure/CONFIG_SITE"
 COMMANDLINE_LIBRARY=
 LINKER_USE_RPATH=NO
 
@@ -199,10 +201,10 @@ EOF
 # architecture.
 #
 # Future, maybe: CROSS_COMPILER_TARGET_ARCHS
-MAKE_ALL_ARGS+=( "EPICS_HOST_ARCH=$EPICS_TARGET_ARCH" )
+MAKE_ALL_ARGS+=("EPICS_HOST_ARCH=$EPICS_TARGET_ARCH")
 echo "* EPICS_TARGET_ARCH=${EPICS_TARGET_ARCH}"
 
-cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_TARGET_ARCH}"
+cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_TARGET_ARCH}"
 CC=$CC
 CCC=$CXX
 AR=$AR -rc
@@ -214,7 +216,7 @@ EOF
 # which they reportedly use:
 SDDS_UTILS="${SRC_DIR}/epics/extensions/src/SDDS/utils"
 sed -i -e 's/H5Dopen(/H5Dopen1(/g' "$SDDS_UTILS/"*.c
-sed -i -e 's/H5Aiterate(/H5Aiterate1(/g'  "$SDDS_UTILS/"*.c
+sed -i -e 's/H5Aiterate(/H5Aiterate1(/g' "$SDDS_UTILS/"*.c
 sed -i -e 's/H5Acreate(/H5Acreate1(/g' "$SDDS_UTILS/"*.c
 sed -i -e 's/H5Gcreate(/H5Gcreate1(/g' "$SDDS_UTILS/"*.c
 sed -i -e 's/H5Dcreate(/H5Dcreate1(/g' "$SDDS_UTILS/"*.c
@@ -222,7 +224,7 @@ sed -i -e 's/H5Dcreate(/H5Dcreate1(/g' "$SDDS_UTILS/"*.c
 sed -i -e 's/^epicsShareFuncFDLIBM //g' "${SRC_DIR}/epics/extensions/src/SDDS/include"/*.h
 
 # Sorry, we're not going to build the motif driver.
-echo -e "all:\ninstall:\nclean:\n" > "${SRC_DIR}/epics/extensions/src/SDDS/SDDSaps/sddsplots/motifDriver/Makefile"
+echo -e "all:\ninstall:\nclean:\n" >"${SRC_DIR}/epics/extensions/src/SDDS/SDDSaps/sddsplots/motifDriver/Makefile"
 
 echo "* Setting up EPICS build system"
 make -C "${SRC_DIR}/epics/base" "${MAKE_ALL_ARGS[@]}"
@@ -244,9 +246,8 @@ make -C "${SRC_DIR}/oag/apps/src/utils/tools" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_
 # We may not *need* to build these individually. However these are the bare
 # minimum necessary for Pelegant. So let's go with it for now.
 for sdds_part in \
-  pgapack    \
-  cmatlib    \
-; do
+  pgapack \
+  cmatlib; do
   echo "* Building SDDS $sdds_part"
   make -C "${SRC_DIR}/epics/extensions/src/SDDS/${sdds_part}" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}"
 done
@@ -269,7 +270,7 @@ ELEGANT_ROOT="${SRC_DIR}/oag/apps/src/elegant"
 
 if [[ $(uname -s) == 'Linux' ]]; then
   # Include libgomp for Linux builds for the remainder of the tools
-  cat <<EOF >> "${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
+  cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
 USR_LDFLAGS+= -lgomp
 EOF
 fi
@@ -290,8 +291,7 @@ make -C "${ELEGANT_ROOT}" \
 for build_path in \
   "${SRC_DIR}/oag/apps/src/physics" \
   "${SRC_DIR}/oag/apps/src/xraylib" \
-  "${ELEGANT_ROOT}/elegantTools" \
-; do
+  "${ELEGANT_ROOT}/elegantTools"; do
   echo "* Building $build_path"
   make -C "$build_path" "${MAKE_ALL_ARGS[@]}" "${MAKE_GSL_ARGS[@]}"
 done
