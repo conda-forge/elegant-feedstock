@@ -1,6 +1,6 @@
 {% set name = "elegant" %}
 {% set version = "2023.4.0" %}
-{% set build = 5 %}
+{% set build = 6 %}
 
 package:
   name: {{ name|lower }}
@@ -66,7 +66,7 @@ requirements:
     - {{ mpi }}
     - ncurses
     - python
-    - xz
+    - liblzma-devel
     - zlib
     - zstd  # [osx]
   run:
