@@ -1,6 +1,6 @@
 {% set name = "elegant" %}
-{% set version = "2023.4.0" %}
-{% set build = 5 %}
+{% set version = "2025.2.0" %}
+{% set build = 0 %}
 
 package:
   name: {{ name|lower }}
@@ -8,7 +8,7 @@ package:
 
 source:
   - url: https://ops.aps.anl.gov/downloads/elegant.{{ version }}.tar.gz
-    sha256: 22c43e81c172258783073cd84b9b498a60288d26492f8e1c056c17bc6b207ff0
+    sha256: f9341ba474cd5c101efd0943bd9acb1683f4f0cd1da943ecc19ea9e53ae26848
     folder: src/elegant
   - url: https://ops.aps.anl.gov/downloads/oag.apps.configure.tar.gz
     sha256: eef0912a70b069e55d1df24cd008f42e6a5923e35461f2b69f92cd1e7e2d4596
