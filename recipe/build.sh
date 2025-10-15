@@ -113,13 +113,15 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
         AR="$(which ar) -rc" \
         RANLIB=$(which ranlib) \
         USR_CFLAGS_Darwin=-I${BUILD_PREFIX}/include \
-        USR_LDFLAGS_Darwin=-L${BUILD_PREFIX}/lib
+        USR_LDFLAGS_Darwin="-L${BUILD_PREFIX}/lib -Wl,-rpath,${BUILD_PREFIX}/lib"
     done
     ls -l "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/"
     if [ ! -f "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/nlpp" ]; then
       echo "* nlpp not built for the host; unable to continue"
       exit 1
     fi
+    "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/nlpp" || true
+
     EPICS_TARGET_ARCH="darwin-aarch64"
 
     if [[ "${mpi}" == "mpich" ]]; then
