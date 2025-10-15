@@ -69,6 +69,7 @@ EOF
 if [[ $(uname -s) == 'Linux' ]]; then
   cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
 USR_LDFLAGS+= -Wl,--disable-new-dtags -Wl,-rpath-link,${PREFIX}/lib
+USR_CFLAGS += -Wno-error=incompatible-pointer-types
 EOF
   # On Linux, ensure libgomp is included during linking:
   sed -i -e "s/PROD_SYS_LIBS\s*+=.*/\0 gomp/" \
