@@ -66,9 +66,17 @@ CC=${CC_FOR_BUILD}
 CCC=${CXX_FOR_BUILD}
 EOF
 
+echo "* Removing vendored libraries"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/png"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/gd"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/tiff"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/zlib"
+rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/lzma"
+
 if [[ $(uname -s) == 'Linux' ]]; then
   cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
 USR_LDFLAGS+= -Wl,--disable-new-dtags -Wl,-rpath-link,${PREFIX}/lib
+USR_CFLAGS += -Wno-error=incompatible-pointer-types
 EOF
   # On Linux, ensure libgomp is included during linking:
   sed -i -e "s/PROD_SYS_LIBS\s*+=.*/\0 gomp/" \
@@ -93,22 +101,27 @@ elif [[ $(uname -s) == 'Darwin' ]]; then
     python -c "print('Python is available')" || exit 1
 
     # NOTE: we are doing this specifically before the vendored libraries are removed.
-    # Otherwise, we'll need to install lzma for darwin-x86_64.  This `nlpp` binary
-    # and related x86-64 libraries will *not* be included in the conda package.
+    # This `nlpp` binary and related x86-64 libraries will *not* be included in the conda package
+    # and are solely for the build process.
     echo "* Building essential tools on the host for cross-compilation (specifically: nlpp)"
     for path in \
       "${SRC_DIR}/epics/base" \
-      "${SRC_DIR}/epics/extensions/src/SDDS/lzma" \
       "${SRC_DIR}/epics/extensions/src/SDDS/mdblib" \
       "${SRC_DIR}/epics/extensions/src/SDDS/namelist"; do
-      echo "* Building $path"
-      make -C "$path" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}"
+      echo "* Building $path for the build host architecture (x86-64)"
+      make -C "$path" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}" \
+        AR="$(which ar) -rc" \
+        RANLIB=$(which ranlib) \
+        USR_CFLAGS_Darwin=-I${BUILD_PREFIX}/include \
+        USR_LDFLAGS_Darwin="-L${BUILD_PREFIX}/lib -Wl,-rpath,${BUILD_PREFIX}/lib"
     done
     ls -l "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/"
     if [ ! -f "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/nlpp" ]; then
       echo "* nlpp not built for the host; unable to continue"
       exit 1
     fi
+    "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/nlpp" || true
+
     EPICS_TARGET_ARCH="darwin-aarch64"
 
     if [[ "${mpi}" == "mpich" ]]; then
@@ -139,13 +152,6 @@ OP_SYS_INCLUDES += -I${PREFIX}/include
 EOF
 
 fi
-
-echo "* Removing vendored libraries for the target build"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/png"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/gd"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/lzma"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/tiff"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/zlib"
 
 echo "* Patching Makefiles to not use vendored libraries"
 # The build system will try to use these regardless of our settings:

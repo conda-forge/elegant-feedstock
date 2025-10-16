@@ -1,6 +1,6 @@
 {% set name = "elegant" %}
 {% set version = "2023.4.0" %}
-{% set build = 5 %}
+{% set build = 6 %}
 
 package:
   name: {{ name|lower }}
@@ -50,6 +50,7 @@ requirements:
     - make
     - python
     - libxcrypt  # [py>=313 and linux]
+    - liblzma-devel  # [build_platform != target_platform]
   host:
     - blas * *openblas
     - libopenblas
@@ -66,7 +67,7 @@ requirements:
     - {{ mpi }}
     - ncurses
     - python
-    - xz
+    - liblzma-devel
     - zlib
     - zstd  # [osx]
   run:
