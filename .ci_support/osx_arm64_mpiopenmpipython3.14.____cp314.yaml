@@ -37,7 +37,7 @@ macos_machine:
 mpi:
 - openmpi
 mpich:
-- '4'
+- '5'
 ncurses:
 - '6'
 openmpi:
