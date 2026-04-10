@@ -50,7 +50,7 @@ requirements:
     - liblapack * *openblas  # [linux]
     - liblapacke * *openblas  # [linux]
     - libblas * *openblas  # [linux]
-    - libopenblas  # [linux]
+    - openblas  # [linux]
   run:
     - {{ mpi }}
 
