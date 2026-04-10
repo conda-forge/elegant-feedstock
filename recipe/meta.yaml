@@ -53,6 +53,7 @@ requirements:
   run:
     - {{ mpi }}
     - libblas * *openblas  # [linux]
+    - libcblas * *openblas  # [linux]
     - openblas  # [linux]
 
 test:
