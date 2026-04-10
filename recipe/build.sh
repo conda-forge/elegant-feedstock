@@ -45,10 +45,10 @@ for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
   # Remove -mcpu=native for reproducible builds
   sed -i'' -e 's/-mcpu=native//g' "$rules_file"
 
-  # Fix LAPACKE include path: the default points to /usr/include/lapacke,
-  # but conda's liblapacke puts lapacke.h in $PREFIX/include (already in
-  # EXTRA_INC_DIRS via library detection).
+  # Remove hardcoded system include paths — conda packages put headers in
+  # $PREFIX/include which is already in EXTRA_INC_DIRS via library detection.
   sed -i'' -e 's|-I/usr/include/lapacke||g' "$rules_file"
+  sed -i'' -e 's|-I/usr/include/hdf5/serial||g' "$rules_file"
 done
 
 # Remove -m64 on non-x86_64 targets (would error on aarch64)
@@ -78,6 +78,10 @@ printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddsplots/qtDriver/Makefile
 sed -i'' -e '/^# Special compilation rule/d' SDDS/SDDSaps/sddsplots/Makefile
 sed -i'' -e '/^O\.Linux-x86_64\/sddsplot\.o/d' SDDS/SDDSaps/sddsplots/Makefile
 sed -i'' -e '/gcc -m64 -O0/d' SDDS/SDDSaps/sddsplots/Makefile
+
+# --- Remove hardcoded HDF5 system include path from SDDS/utils ---
+
+sed -i'' -e 's|-I/usr/include/hdf5/serial||g' SDDS/utils/Makefile
 
 # --- Remove -Bstatic/-static-libgcc from elegant MPI Makefile ---
 # We want dynamic linking
