@@ -64,13 +64,15 @@ done
 printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddseditor/Makefile
 printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddsplots/qtDriver/Makefile
 
-# --- Patch hardcoded gcc in sddsplots (optimization bug workaround) ---
-# SDDS/SDDSaps/sddsplots/Makefile hardcodes gcc for a specific object file to
-# work around an -O3 optimization bug.
+# --- Remove hardcoded gcc rule in sddsplots ---
+# SDDS/SDDSaps/sddsplots/Makefile has a special rule that hardcodes gcc and
+# its own flags (missing $(EXTRA_INC_DIRS)) to work around an -O3 optimization
+# bug. Remove it so the default rule from Makefile.build handles it with the
+# correct compiler and flags.
 
-sed -i'' -e "s|gcc -m64 -O0|${CC} -O0|" SDDS/SDDSaps/sddsplots/Makefile
-# Also fix the include path:
-sed -i'' -e 's|-I/usr/include ||g' SDDS/SDDSaps/sddsplots/Makefile
+sed -i'' -e '/^# Special compilation rule/d' SDDS/SDDSaps/sddsplots/Makefile
+sed -i'' -e '/^O\.Linux-x86_64\/sddsplot\.o/d' SDDS/SDDSaps/sddsplots/Makefile
+sed -i'' -e '/gcc -m64 -O0/d' SDDS/SDDSaps/sddsplots/Makefile
 
 # --- Remove -Bstatic/-static-libgcc from elegant MPI Makefile ---
 # We want dynamic linking
