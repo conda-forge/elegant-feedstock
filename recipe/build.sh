@@ -2,6 +2,11 @@
 
 set -ex -o pipefail
 
+# Remove static libraries from the prefix to force dynamic linking.
+# The Makefile.rules wildcard detection prefers .a over .so, so without
+# this, external libraries (gsl, fftw, etc.) would be statically linked.
+rm -f "$PREFIX/lib/"*.a
+
 OS=$(uname -s)
 ARCH=$(uname -m)
 TARGET_ARCH="$ARCH"

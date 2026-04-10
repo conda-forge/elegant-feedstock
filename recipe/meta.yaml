@@ -23,10 +23,8 @@ build:
   run_exports:
     - {{ name }} * mpi_{{ mpi }}_*
   ignore_run_exports:
-    # Linked transitively via hdf5:
     - libaec
     - zstd  # [osx]
-    - libgomp  # [linux]
 
 requirements:
   build:
@@ -42,17 +40,20 @@ requirements:
     - hdf5 * mpi_{{ mpi }}_*
     - libaec
     - libgd
+    - libgomp  # [linux]
     - liblzma-devel
     - libpng
     - libtiff
     - zlib
     - {{ mpi }}
-    - liblapack * *openblas  # [linux]
-    - liblapacke * *openblas  # [linux]
-    - libblas * *openblas  # [linux]
+    - liblapack # [linux]
+    - liblapacke # [linux]
+    - libblas # [linux]
     - openblas  # [linux]
   run:
     - {{ mpi }}
+    - libblas * *openblas  # [linux]
+    - openblas  # [linux]
 
 test:
   commands:
