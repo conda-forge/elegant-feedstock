@@ -2,326 +2,165 @@
 
 set -ex -o pipefail
 
-# Remove static libraries from the prefix to prevent static linking
-rm "$PREFIX/lib/"*.a
+OS=$(uname -s)
+ARCH=$(uname -m)
+TARGET_ARCH="$ARCH"
+CROSS_COMPILING=0
 
-mkdir oag
-mkdir epics
-
-# Archives have overlapping directories. Additionally, conda will remove empty
-# top-level directories which is not what we want.  So here we combine
-# all of the extracted contents into their correct spots:
-cp -r src/elegant/* oag
-cp -r src/oag-apps/* oag
-cp -r src/sdds/* epics/
-cp -r src/epics-base/* epics/
-cp -r src/epics-extensions/* epics/
-
-rm -rf src/
-
-if ! command -v mpicc; then
-  echo "* mpicc not found? Was the environment built correctly?"
-  exit 1
-fi
-
-echo "* Work root:    $SRC_DIR"
+echo "* OS:           $OS"
+echo "* ARCH:         $ARCH"
 echo "* Conda prefix: $PREFIX"
+echo "* CC:           $CC"
+echo "* CXX:          $CXX"
+echo "* FC:           $FC"
 
-echo "* Patching EPICS_BASE path for oag"
-# shellcheck disable=SC2016
-sed -i -e 's@^#\s*EPICS_BASE.*@EPICS_BASE=$(TOP)/../../epics/base@' "${SRC_DIR}/oag/apps/configure/RELEASE"
+if [[ "$host_alias" != "$build_alias" ]]; then # shellcheck disable=SC2154
+  CROSS_COMPILING=1
+  TARGET_ARCH="arm64"
+  echo "* Cross-compiling from $ARCH to $TARGET_ARCH"
+fi
 
-echo "* Add missing header file to fix implicit function calls"
-sed -i -e '1s/^/#include <stdio.h>\n/' "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/cm_test.c
-sed -i -e 's/gets(s)/fgets(s, sizeof(s), stdin)/' "${SRC_DIR}"/epics/extensions/src/SDDS/cmatlib/cm_test.c
+# --- Patch Makefile.rules in both repos ---
 
-EPICS_HOST_ARCH=$("${SRC_DIR}"/epics/base/startup/EpicsHostArch)
-EPICS_TARGET_ARCH="${EPICS_HOST_ARCH}"
-echo "* EPICS_HOST_ARCH=${EPICS_HOST_ARCH}"
+for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
+  # Add conda prefix to library search paths (LIB_DIRS is used for wildcard
+  # detection of system libraries like gsl, fftw, hdf5, etc.)
+  sed -i'' -e "s|^LIB_DIRS := |LIB_DIRS := ${PREFIX}/lib |" "$rules_file"
 
-MAKE_ALL_ARGS=(
-  "SVN_VERSION=$PKG_VERSION"
+  # Replace compilers with conda toolchain (Linux section)
+  sed -i'' -e "s|^  CC = gcc\$|  CC = ${CC}|" "$rules_file"
+  sed -i'' -e "s|^  CCC = g++\$|  CCC = ${CXX}|" "$rules_file"
+  sed -i'' -e "s|^  AR = ar rcs\$|  AR = ${AR} rcs|" "$rules_file"
+  sed -i'' -e "s|^  F77 = gfortran -m64 -ffixed-line-length-132\$|  F77 = ${FC} -m64 -ffixed-line-length-132|" "$rules_file"
+
+  # Replace compilers with conda toolchain (Darwin section)
+  sed -i'' -e "s|^  CC = clang\$|  CC = ${CC}|" "$rules_file"
+  sed -i'' -e "s|^  CCC = clang++\$|  CCC = ${CXX}|" "$rules_file"
+  sed -i'' -e "s|^  AR = libtool -static -o\$|  AR = ${AR} rcs|" "$rules_file"
+  sed -i'' -e "s|^  F77 = gfortran-mp-14 -m64 -ffixed-line-length-132\$|  F77 = ${FC} -m64 -ffixed-line-length-132|" "$rules_file"
+
+  # Replace ranlib (same pattern in both sections)
+  sed -i'' -e "s|^  RANLIB = ranlib\$|  RANLIB = ${RANLIB}|" "$rules_file"
+
+  # Remove -mcpu=native for reproducible builds
+  sed -i'' -e 's/-mcpu=native//g' "$rules_file"
+done
+
+# Remove -m64 on non-x86_64 targets (would error on aarch64)
+if [[ "$TARGET_ARCH" != "x86_64" ]]; then
+  for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
+    sed -i'' -e 's/ -m64//g' "$rules_file"
+  done
+fi
+
+# --- Stub out vendored libraries (use conda-forge packages instead) ---
+
+for dir in SDDS/png SDDS/gd SDDS/tiff SDDS/zlib SDDS/lzma; do
+  printf 'all:\ninstall:\nclean:\n' >"$dir/Makefile"
+done
+
+# --- Stub out Qt-based tools for now ---
+
+printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddseditor/Makefile
+printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddsplots/qtDriver/Makefile
+
+# --- Patch hardcoded gcc in sddsplots (optimization bug workaround) ---
+# SDDS/SDDSaps/sddsplots/Makefile hardcodes gcc for a specific object file to
+# work around an -O3 optimization bug.
+
+sed -i'' -e "s|gcc -m64 -O0|${CC} -O0|" SDDS/SDDSaps/sddsplots/Makefile
+# Also fix the include path:
+sed -i'' -e 's|-I/usr/include ||g' SDDS/SDDSaps/sddsplots/Makefile
+
+# --- Remove -Bstatic/-static-libgcc from elegant MPI Makefile ---
+# We want dynamic linking
+
+sed -i'' -e 's/-Bstatic //g' elegant/src/Makefile.mpi
+sed -i'' -e 's/-static-libgcc //g' elegant/src/Makefile.mpi
+
+# --- Set MPI environment ---
+
+export MPICH_CC="$CC"
+export MPICH_CXX="$CXX"
+export OMPI_CC="$CC"
+export OMPI_CXX="$CXX"
+
+# --- Common make arguments ---
+
+MAKE_ARGS=(
+  "MPI_CC=mpicc"
+  "MPI_CCC=mpicxx"
 )
-MAKE_GSL_ARGS=(
-  "GSL=1"
-  "gsl_DIR=$PREFIX/lib"
-  "gslcblas_DIR=$PREFIX/lib"
-)
-MAKE_MPI_ARGS=(
-  "MPI=1"
-  "MPI_PATH=$(dirname "$(which mpicc)")/"
-  "MPICH_CC=$CC"
-  "MPICH_CXX=$CXX"
-)
 
-echo "* Make args:          ${MAKE_ALL_ARGS[*]}"
-echo "* Make GSL args:      ${MAKE_GSL_ARGS[*]}"
-echo "* Make MPI args:      ${MAKE_MPI_ARGS[*]}"
-echo "* Python version:     $PY_VER"
+# --- Cross-compilation handling ---
 
-echo "* Configuring EPICS for ${EPICS_HOST_ARCH}"
+if [[ "$CROSS_COMPILING" == "1" ]]; then
+  echo "* Phase 1: Building all of SDDS for the build machine ($ARCH)"
 
-cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
-CC=${CC_FOR_BUILD}
-CCC=${CXX_FOR_BUILD}
-EOF
+  # nlpp is a code generator that must run on the build machine during the
+  # elegant build. Build the entire SDDS tree natively so nlpp (and all
+  # libraries it depends on) are available.
+  make -C SDDS -j"${CPU_COUNT}" \
+    "CC=${CC_FOR_BUILD}" \
+    "CCC=${CXX_FOR_BUILD}" \
+    "AR=$(which ar) rcs" \
+    "RANLIB=$(which ranlib)"
 
-echo "* Removing vendored libraries"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/png"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/gd"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/tiff"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/zlib"
-rm -rfv "${SRC_DIR}/epics/extensions/src/SDDS/lzma"
-
-if [[ $(uname -s) == 'Linux' ]]; then
-  cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
-USR_LDFLAGS+= -Wl,--disable-new-dtags -Wl,-rpath-link,${PREFIX}/lib
-USR_CFLAGS += -Wno-error=incompatible-pointer-types
-EOF
-  # On Linux, ensure libgomp is included during linking:
-  sed -i -e "s/PROD_SYS_LIBS\s*+=.*/\0 gomp/" \
-    "$SRC_DIR/epics/extensions/src/SDDS/SDDSaps/Makefile" \
-    "$SRC_DIR/epics/extensions/src/SDDS/SDDSaps/sddscontours/Makefile" \
-    "$SRC_DIR/epics/extensions/src/SDDS/SDDSaps/pseudoInverse/Makefile"
-  sed -i -e "s/PROD_SYS_LIBS_DEFAULT\s*=.*/\0 gomp/" \
-    "$SRC_DIR/epics/extensions/src/SDDS/SDDSaps/sddsplots/Makefile"
-elif [[ $(uname -s) == 'Darwin' ]]; then
-  # Skipping pseudoInverse and sddscontours for now on Darwin.
-  # Outside of conda-forge infrastructure with a modern MacOS SDK, these build
-  # without issue. The older MacOS SDK that conda-forge uses has issues with
-  # pseudoInverse and lapack/blas.
-  MAKE_ALL_ARGS+=("BUILD_PSEUDOINVERSE=0")
-  sed -i -e "s#^DIRS += SDDSaps/sddscontours##" \
-    "$SRC_DIR/epics/extensions/src/SDDS/Makefile"
-  sed -i -e "s/^DIRS =.*/DIRS = sddsplots/" \
-    "$SRC_DIR/epics/extensions/src/SDDS/SDDSaps/Makefile"
-  # shellcheck disable=SC2154
-  if [[ "$host_alias" != "$build_alias" ]]; then
-    echo "* Making sure Python is available for the build machine"
-    python -c "print('Python is available')" || exit 1
-
-    # NOTE: we are doing this specifically before the vendored libraries are removed.
-    # This `nlpp` binary and related x86-64 libraries will *not* be included in the conda package
-    # and are solely for the build process.
-    echo "* Building essential tools on the host for cross-compilation (specifically: nlpp)"
-    for path in \
-      "${SRC_DIR}/epics/base" \
-      "${SRC_DIR}/epics/extensions/src/SDDS/mdblib" \
-      "${SRC_DIR}/epics/extensions/src/SDDS/namelist"; do
-      echo "* Building $path for the build host architecture (x86-64)"
-      make -C "$path" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}" \
-        AR="$(which ar) -rc" \
-        RANLIB=$(which ranlib) \
-        USR_CFLAGS_Darwin=-I${BUILD_PREFIX}/include \
-        USR_LDFLAGS_Darwin="-L${BUILD_PREFIX}/lib -Wl,-rpath,${BUILD_PREFIX}/lib"
-    done
-    ls -l "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/"
-    if [ ! -f "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/nlpp" ]; then
-      echo "* nlpp not built for the host; unable to continue"
-      exit 1
-    fi
-    "${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}/nlpp" || true
-
-    EPICS_TARGET_ARCH="darwin-aarch64"
-
-    if [[ "${mpi}" == "mpich" ]]; then
-      echo "* Patching mpicc and mpicxx to allow for cross-compilation to ARM64"
-      # NOTE: mpicc/mpicxx include *build environment* libraries by default
-      # in ldflags, which trips up the linker since it finds the x86-64
-      # versions *before* the ARM64 ones.
-      echo "* Before patch:"
-      grep -e "^final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")"
-      sed -i '' \
-        's/^final_ldflags=".*$/final_ldflags=""/' \
-        "$(readlink -f "$(which mpicc)")" \
-        "$(readlink -f "$(which mpicxx)")"
-      echo "* After patch:"
-      grep -e "final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")"
-    fi
+  NLPP_NATIVE="SDDS/bin/${OS}-${ARCH}/nlpp"
+  if [[ ! -f "$NLPP_NATIVE" ]]; then
+    echo "* ERROR: nlpp was not built for the build machine"
+    exit 1
   fi
-  # oag overwrites USR_CFLAGS; append to the arch-specific ones here instead
-  # to avoid warnings which have become fatal errors:
-  cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.darwinCommon.darwinCommon"
-USR_CFLAGS_Darwin += -Wno-error=incompatible-function-pointer-types
-USR_CXXFLAGS_Darwin += -Wno-error=register
+  echo "* nlpp built successfully"
+  "$NLPP_NATIVE" || true
 
-OP_SYS_CFLAGS += -isysroot \${CONDA_BUILD_SYSROOT} -mmacosx-version-min=\${MACOSX_DEPLOYMENT_TARGET}
-OP_SYS_CXXFLAGS += -isysroot \${CONDA_BUILD_SYSROOT} -mmacosx-version-min=\${MACOSX_DEPLOYMENT_TARGET}
-OP_SYS_LDFLAGS += -Wl,-rpath,${PREFIX}/lib -L${PREFIX}/lib
-OP_SYS_INCLUDES += -I${PREFIX}/include
-EOF
+  # Save native nlpp
+  cp "$NLPP_NATIVE" "${SRC_DIR}/nlpp_native"
 
+  # For mpich: patch wrappers to remove build-prefix library paths
+  # that would cause the linker to find x86_64 libs before arm64 ones.
+  # shellcheck disable=SC2154
+  if [[ "${mpi}" == "mpich" ]]; then
+    echo "* Patching mpicc/mpicxx for cross-compilation"
+    echo "* Before patch:"
+    grep -e "^final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")" || true
+    sed -i '' \
+      's/^final_ldflags=".*$/final_ldflags=""/' \
+      "$(readlink -f "$(which mpicc)")" \
+      "$(readlink -f "$(which mpicxx)")"
+    echo "* After patch:"
+    grep -e "final_ldflags=" "$(readlink -f "$(which mpicc)")" "$(readlink -f "$(which mpicxx)")" || true
+  fi
+
+  echo "* Phase 2: Building SDDS for target ($TARGET_ARCH)"
+  make -C SDDS -j"${CPU_COUNT}" "ARCH=${TARGET_ARCH}" "${MAKE_ARGS[@]}"
+
+  echo "* Restoring native nlpp for elegant build"
+  cp "${SRC_DIR}/nlpp_native" "SDDS/bin/${OS}-${TARGET_ARCH}/nlpp"
+  chmod +x "SDDS/bin/${OS}-${TARGET_ARCH}/nlpp"
+
+  echo "* Phase 2: Building elegant for target ($TARGET_ARCH)"
+  make -C elegant -j"${CPU_COUNT}" "ARCH=${TARGET_ARCH}" "${MAKE_ARGS[@]}"
+
+  ARCH="$TARGET_ARCH"
+else
+  # --- Native build ---
+
+  echo "* Building SDDS"
+  make -C SDDS -j"${CPU_COUNT}" "${MAKE_ARGS[@]}"
+
+  echo "* Building elegant"
+  make -C elegant -j"${CPU_COUNT}" "${MAKE_ARGS[@]}"
 fi
 
-echo "* Patching Makefiles to not use vendored libraries"
-# The build system will try to use these regardless of our settings:
-sed -i -e '/^DIRS += zlib lzma$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-sed -i -e '/^DIRS += png$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-sed -i -e '/^DIRS += gd$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-sed -i -e '/^DIRS += tiff$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
-# This will also force it to use the vendored zlib:
-sed -i -e '/^mdblib_DEPEND_DIRS = zlib$/d' "${SRC_DIR}/epics/extensions/src/SDDS/Makefile"
+# --- Install ---
 
-echo "* Configuring EPICS for all architectures"
+echo "* Installing binaries to $PREFIX/bin"
+mkdir -p "${PREFIX}/bin"
+cp -f "SDDS/bin/${OS}-${ARCH}/"* "${PREFIX}/bin/" 2>/dev/null || true
+cp -f "elegant/bin/${OS}-${ARCH}/"* "${PREFIX}/bin/" 2>/dev/null || true
 
-cat <<EOF >>"${SRC_DIR}/epics/base/configure/CONFIG_SITE"
-COMMANDLINE_LIBRARY=
-LINKER_USE_RPATH=NO
+# Make binaries writeable so patchelf/install_name_tool can modify them
+chmod +w "${PREFIX}/bin/"* 2>/dev/null || true
 
-USR_INCLUDES+= -I $PREFIX/include
-USR_LDFLAGS=$LDFLAGS
-USER_MPI_FLAGS="-DUSE_MPI=1 -DSDDS_MPI_IO=1 -I${PREFIX}/include"
-
-override HDF_LIB_LOCATION=$PREFIX/lib
-override SVN_VERSION=$PKG_VERSION
-override zlib_DIR=$PREFIX/lib
-override lzma_DIR=$PREFIX/lib
-override png_DIR=$PREFIX/lib
-override gd_DIR=$PREFIX/lib
-override tiff_DIR=$PREFIX/lib
-EOF
-
-cat <<EOF >>"${SRC_DIR}/epics/extensions/configure/CONFIG_SITE"
-COMMANDLINE_LIBRARY=
-LINKER_USE_RPATH=NO
-
-USR_INCLUDES+= -I $PREFIX/include
-USR_LDFLAGS=$LDFLAGS
-USER_MPI_FLAGS="-DUSE_MPI=1 -DSDDS_MPI_IO=1 -I${PREFIX}/include"
-
-override HDF_LIB_LOCATION=$PREFIX/lib
-override SVN_VERSION=$PKG_VERSION
-override zlib_DIR=$PREFIX/lib
-override lzma_DIR=$PREFIX/lib
-override png_DIR=$PREFIX/lib
-override gd_DIR=$PREFIX/lib
-override tiff_DIR=$PREFIX/lib
-EOF
-
-# For cross-compilation, we are going to fake the host architecture to avoid
-# building elegant twice - we don't have all of the dependencies for both
-# architectures.
-#
-# We should just need some basic tools like nlpp built
-# for the host architecture be cross-compile elegant for the target
-# architecture.
-#
-# Future, maybe: CROSS_COMPILER_TARGET_ARCHS
-MAKE_ALL_ARGS+=("EPICS_HOST_ARCH=$EPICS_TARGET_ARCH")
-echo "* EPICS_TARGET_ARCH=${EPICS_TARGET_ARCH}"
-
-cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_TARGET_ARCH}"
-CC=$CC
-CCC=$CXX
-AR=$AR -rc
-LD=$LD
-RANLIB=$RANLIB
-EOF
-
-# APS may have this patched locally; these were changed long before 1.12.1
-# which they reportedly use:
-SDDS_UTILS="${SRC_DIR}/epics/extensions/src/SDDS/utils"
-sed -i -e 's/H5Dopen(/H5Dopen1(/g' "$SDDS_UTILS/"*.c
-sed -i -e 's/H5Aiterate(/H5Aiterate1(/g' "$SDDS_UTILS/"*.c
-sed -i -e 's/H5Acreate(/H5Acreate1(/g' "$SDDS_UTILS/"*.c
-sed -i -e 's/H5Gcreate(/H5Gcreate1(/g' "$SDDS_UTILS/"*.c
-sed -i -e 's/H5Dcreate(/H5Dcreate1(/g' "$SDDS_UTILS/"*.c
-
-sed -i -e 's/^epicsShareFuncFDLIBM //g' "${SRC_DIR}/epics/extensions/src/SDDS/include"/*.h
-
-# Sorry, we're not going to build the motif driver.
-echo -e "all:\ninstall:\nclean:\n" >"${SRC_DIR}/epics/extensions/src/SDDS/SDDSaps/sddsplots/motifDriver/Makefile"
-
-echo "* Setting up EPICS build system"
-make -C "${SRC_DIR}/epics/base" "${MAKE_ALL_ARGS[@]}"
-
-echo "* Building SDDS"
-# First, build some non-MPI things (otherwise we don't get editstring, nlpp)
-make -C "${SRC_DIR}/epics/extensions/src/SDDS" "${MAKE_ALL_ARGS[@]}"
-
-# Clean out the artifacts from the non-MPI build and then build with MPI:
-echo "* Cleaning non-MPI build"
-make -C "${SRC_DIR}/epics/extensions/src/SDDS" "${MAKE_ALL_ARGS[@]}" clean
-
-echo "* Building SDDSlib with MPI"
-make -C "${SRC_DIR}/epics/extensions/src/SDDS/SDDSlib" "${MAKE_MPI_ARGS[@]}" "${MAKE_ALL_ARGS[@]}"
-
-echo "* Building SDDS tools"
-make -C "${SRC_DIR}/oag/apps/src/utils/tools" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}"
-
-# We may not *need* to build these individually. However these are the bare
-# minimum necessary for Pelegant. So let's go with it for now.
-for sdds_part in \
-  pgapack \
-  cmatlib; do
-  echo "* Building SDDS $sdds_part"
-  make -C "${SRC_DIR}/epics/extensions/src/SDDS/${sdds_part}" "${MAKE_ALL_ARGS[@]}" "${MAKE_MPI_ARGS[@]}"
-done
-
-echo "* Building SDDS python"
-make -C "${SRC_DIR}/epics/extensions/src/SDDS/python" \
-  "${MAKE_ALL_ARGS[@]}" \
-  "${MAKE_MPI_ARGS[@]}" \
-  PYTHON3=1 \
-  PYTHON_PREFIX="$PREFIX" \
-  PYTHON_EXEC_PREFIX="$PREFIX" \
-  PYTHON_VERSION="$PY_VER" \
-  LIB_LIBS="SDDS1 rpnlib mdblib mdbmth" \
-  USR_SYS_LIBS="python${PY_VER} lzma"
-
-echo "* Adding extension bin directory to PATH for nlpp"
-export PATH="${SRC_DIR}/epics/extensions/bin/${EPICS_HOST_ARCH}:$PATH"
-
-ELEGANT_ROOT="${SRC_DIR}/oag/apps/src/elegant"
-
-if [[ $(uname -s) == 'Linux' ]]; then
-  # Include libgomp for Linux builds for the remainder of the tools
-  cat <<EOF >>"${SRC_DIR}/epics/base/configure/os/CONFIG_SITE.Common.${EPICS_HOST_ARCH}"
-USR_LDFLAGS+= -lgomp
-EOF
-fi
-
-echo "* Building parallel elegant first"
-make -C "${ELEGANT_ROOT}" \
-  Pelegant \
-  "${MAKE_ALL_ARGS[@]}" \
-  "${MAKE_MPI_ARGS[@]}" \
-  "${MAKE_GSL_ARGS[@]}"
-
-echo "* Building regular elegant second"
-make -C "${ELEGANT_ROOT}" \
-  MPI=0 NOMPI=1 \
-  "${MAKE_ALL_ARGS[@]}" \
-  "${MAKE_GSL_ARGS[@]}"
-
-for build_path in \
-  "${SRC_DIR}/oag/apps/src/physics" \
-  "${SRC_DIR}/oag/apps/src/xraylib" \
-  "${ELEGANT_ROOT}/elegantTools"; do
-  echo "* Building $build_path"
-  make -C "$build_path" "${MAKE_ALL_ARGS[@]}" "${MAKE_GSL_ARGS[@]}"
-done
-
-echo "* Building sddsbrightness (Fortran)"
-make -C "${ELEGANT_ROOT}/sddsbrightness" \
-  "${MAKE_ALL_ARGS[@]}" \
-  "${MAKE_GSL_ARGS[@]}" \
-  F77="${GFORTRAN} -m64 -ffixed-line-length-132" \
-  static_flags="-L$PREFIX/lib"
-
-echo "* Build succeeded"
-
-echo "* Making binaries writeable so patchelf/install_name_tool will work"
-chmod +w "${SRC_DIR}/oag/apps/bin/${EPICS_TARGET_ARCH}/"*
-chmod +w "${SRC_DIR}/epics/extensions/bin/${EPICS_TARGET_ARCH}/"*
-chmod +w "${SRC_DIR}/epics/extensions/lib/${EPICS_TARGET_ARCH}/"*
-
-SITE_PACKAGES_DIR="$PREFIX/lib/python${PY_VER}/site-packages"
-
-echo "* Installing sdds library to $SITE_PACKAGES_DIR"
-cp "${SRC_DIR}/epics/extensions/src/SDDS/python/sdds.py" "$SITE_PACKAGES_DIR"
-cp "${SRC_DIR}/epics/extensions/lib/${EPICS_TARGET_ARCH}/sddsdata."* "$SITE_PACKAGES_DIR/sddsdata.so"
-
-echo "* Installing binaries to $PREFIX"
-cp "${SRC_DIR}/oag/apps/bin/${EPICS_TARGET_ARCH}/"* "${PREFIX}/bin"
-cp "${SRC_DIR}/epics/extensions/bin/${EPICS_TARGET_ARCH}/"* "${PREFIX}/bin"
+echo "* Build and install complete"
