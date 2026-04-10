@@ -49,6 +49,9 @@ for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
   # $PREFIX/include which is already in EXTRA_INC_DIRS via library detection.
   sed -i'' -e 's|-I/usr/include/lapacke||g' "$rules_file"
   sed -i'' -e 's|-I/usr/include/hdf5/serial||g' "$rules_file"
+
+  # Add -L$PREFIX/lib so the linker can find -llapack -lblas from conda.
+  sed -i'' -e "s|LAPACK_LIB = -llapack -lblas|LAPACK_LIB = -L${PREFIX}/lib -llapack -lblas|" "$rules_file"
 done
 
 # Remove -m64 on non-x86_64 targets (would error on aarch64)
