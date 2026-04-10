@@ -44,6 +44,11 @@ for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
 
   # Remove -mcpu=native for reproducible builds
   sed -i'' -e 's/-mcpu=native//g' "$rules_file"
+
+  # Fix LAPACKE include path: the default points to /usr/include/lapacke,
+  # but conda's liblapacke puts lapacke.h in $PREFIX/include (already in
+  # EXTRA_INC_DIRS via library detection).
+  sed -i'' -e 's|-I/usr/include/lapacke||g' "$rules_file"
 done
 
 # Remove -m64 on non-x86_64 targets (would error on aarch64)

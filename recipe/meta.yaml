@@ -48,6 +48,7 @@ requirements:
     - zlib
     - {{ mpi }}
     - liblapack * *openblas  # [linux]
+    - liblapacke * *openblas  # [linux]
     - libblas * *openblas  # [linux]
     - libopenblas  # [linux]
   run:
