@@ -46,10 +46,10 @@ requirements:
     - libtiff
     - zlib
     - {{ mpi }}
-    - liblapack # [linux]
-    - liblapacke # [linux]
-    - libblas # [linux]
-    - openblas  # [linux]
+    - liblapack    # [linux]
+    - liblapacke   # [linux]
+    - libblas      # [linux]
+    - openblas     # [linux]
   run:
     - {{ mpi }}
     - libblas * *openblas  # [linux]
