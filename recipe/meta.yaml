@@ -39,6 +39,7 @@ requirements:
     - {{ mpi }}
     - make
   host:
+    - eigen
     - fftw * mpi_{{ mpi }}_*
     - gsl
     - hdf5 * mpi_{{ mpi }}_*

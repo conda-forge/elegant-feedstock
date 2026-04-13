@@ -72,10 +72,16 @@ for dir in SDDS/png SDDS/gd SDDS/tiff SDDS/zlib SDDS/lzma; do
   printf 'all:\ninstall:\nclean:\n' >"$dir/Makefile"
 done
 
-# --- Stub out Qt-based tools for now ---
+# --- Stub out Qt-based tools ---
 
 printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddseditor/Makefile
 printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddsplots/qtDriver/Makefile
+
+# --- Fix sddsupsample Eigen detection ---
+# The Makefile searches hardcoded paths for Eigen. Add $PREFIX/include to
+# the search so conda's eigen package is found.
+
+sed -i'' -e "s|EIGEN3_DIR = \$(firstword|EIGEN3_DIR = \$(firstword \$(wildcard ${PREFIX}/include/eigen3)|" elegant/elegantTools/Makefile
 
 # --- Fix CLAPACK/Accelerate on macOS ---
 # The Darwin code paths use -DCLAPACK with Apple Accelerate's __LAPACK_int types
