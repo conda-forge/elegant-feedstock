@@ -77,6 +77,21 @@ done
 printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddseditor/Makefile
 printf 'all:\ninstall:\nclean:\n' >SDDS/SDDSaps/sddsplots/qtDriver/Makefile
 
+# --- Fix CLAPACK/Accelerate on macOS ---
+# The Darwin code paths use -DCLAPACK with Apple Accelerate's __LAPACK_int types
+# which are not available in conda-forge's older macOS SDK. Switch to the LAPACK
+# code path (lapacke.h + openblas), same as Linux.
+
+if [[ "$OS" == "Darwin" ]]; then
+  for mf in \
+    SDDS/SDDSaps/pseudoInverse/Makefile \
+    elegant/src/Makefile \
+    elegant/src/Makefile.mpi; do
+    sed -i'' -e 's/-DCLAPACK/-DLAPACK/' "$mf"
+    sed -i'' -e "s|-framework Accelerate|-L${PREFIX}/lib -llapacke -llapack -lblas|" "$mf"
+  done
+fi
+
 # --- Remove hardcoded gcc rule in sddsplots ---
 # SDDS/SDDSaps/sddsplots/Makefile has a special rule that hardcodes gcc and
 # its own flags (missing $(EXTRA_INC_DIRS)) to work around an -O3 optimization
