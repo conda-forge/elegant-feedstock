@@ -15,6 +15,10 @@ source:
   - url: https://github.com/rtsoliday/SDDS/archive/refs/tags/SDDS-{{ sdds_version }}.tar.gz
     sha256: 322aec6b5c9d2e620d5252a275dbf8c8dbfe53f58391aed8c30e610f7bc4ec62
     folder: SDDS
+  # Standalone nlpp (namelist preprocessor) for cross-compilation:
+  - url: https://github.com/ken-lauer/sdds-nlpp/archive/refs/tags/v0.0.1.tar.gz
+    sha256: b895864408b607aab66f753db2904f7d2157adc306c61b2d6498f7b6bdb81a2e
+    folder: nlpp_standalone
 
 build:
   skip: true  # [win]

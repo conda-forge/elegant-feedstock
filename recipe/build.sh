@@ -142,48 +142,19 @@ MAKE_ARGS=(
 # --- Cross-compilation handling ---
 
 if [[ "$CROSS_COMPILING" == "1" ]]; then
-  echo "* Phase 1: Building nlpp for the build machine ($ARCH)"
+  echo "* Phase 1: Building standalone nlpp for the build machine ($ARCH)"
 
-  # Build only libraries (not executables) for the nlpp dependency chain.
-  # rpns/code and namelist also build executables (rpn, nlpp) that link
-  # against external libs (gsl, zlib) — those are arm64 in $PREFIX and
-  # can't be linked by the native x86_64 compiler. So we build libraries
-  # first, then only the nlpp executable from namelist.
-  NATIVE_MAKE_ARGS=(
-    "CC=${CC_FOR_BUILD}"
-    "CCC=${CXX_FOR_BUILD}"
-    "AR=$(which ar) rcs"
-    "RANLIB=$(which ranlib)"
-  )
+  # nlpp is a namelist preprocessor that must run on the build machine.
+  # Use the standalone version (no SDDS dependencies) for cross-compilation.
+  make -C nlpp_standalone "CC=${CC_FOR_BUILD}"
 
-  for dir in \
-    SDDS/include \
-    SDDS/meschach \
-    SDDS/xlslib \
-    SDDS/mdblib \
-    SDDS/mdbmth; do
-    echo "* Building $dir for build machine"
-    make -C "$dir" "${NATIVE_MAKE_ARGS[@]}"
-  done
-
-  # rpns/code: build only the library, skip rpn/rpnl/if2pf executables
-  echo "* Building SDDS/rpns/code (library only) for build machine"
-  make -C SDDS/rpns/code "${NATIVE_MAKE_ARGS[@]}" PROD=""
-
-  # namelist: build library + nlpp executable (nlpp only links internal libs)
-  echo "* Building SDDS/namelist for build machine"
-  make -C SDDS/namelist "${NATIVE_MAKE_ARGS[@]}"
-
-  NLPP_NATIVE="SDDS/bin/${OS}-${ARCH}/nlpp"
+  NLPP_NATIVE="nlpp_standalone/nlpp"
   if [[ ! -f "$NLPP_NATIVE" ]]; then
     echo "* ERROR: nlpp was not built for the build machine"
     exit 1
   fi
   echo "* nlpp built successfully"
   "$NLPP_NATIVE" || true
-
-  # Save native nlpp
-  cp "$NLPP_NATIVE" "${SRC_DIR}/nlpp_native"
 
   # For mpich: patch wrappers to remove build-prefix library paths
   # that would cause the linker to find x86_64 libs before arm64 ones.
@@ -203,8 +174,9 @@ if [[ "$CROSS_COMPILING" == "1" ]]; then
   echo "* Phase 2: Building SDDS for target ($TARGET_ARCH)"
   make -C SDDS -j"${CPU_COUNT}" "ARCH=${TARGET_ARCH}" "${MAKE_ARGS[@]}"
 
-  echo "* Restoring native nlpp for elegant build"
-  cp "${SRC_DIR}/nlpp_native" "SDDS/bin/${OS}-${TARGET_ARCH}/nlpp"
+  # Place native nlpp where the elegant build expects it
+  echo "* Installing native nlpp for elegant build"
+  cp "$NLPP_NATIVE" "SDDS/bin/${OS}-${TARGET_ARCH}/nlpp"
   chmod +x "SDDS/bin/${OS}-${TARGET_ARCH}/nlpp"
 
   echo "* Phase 2: Building elegant for target ($TARGET_ARCH)"
