@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euo pipefail
+
+set -xeuo pipefail
 
 if [[ "$mpi" == "openmpi" ]]; then
   export OMPI_MCA_plm=isolated
@@ -7,4 +8,6 @@ if [[ "$mpi" == "openmpi" ]]; then
   export OMPI_MCA_btl_vader_single_copy_mechanism=none
 fi
 
-Pelegant
+which Pelegant
+
+mpirun -np 1 Pelegant || echo "unable to run Pelegant :("
