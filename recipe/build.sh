@@ -104,10 +104,15 @@ if [[ "$OS" == "Darwin" ]]; then
     sed -i'' -e 's/defined(__APPLE__)/defined(__APPLE__) \&\& defined(CLAPACK)/g' "$src"
   done
 
-  # Work around macOS SDK conflict: zconf.h includes unistd.h which
-  # re-declares swab/mknod/setkey already declared in other SDK headers,
-  # causing "conflicting types" errors. Suppress the include.
-  sed -i'' -e 's/^CFLAGS += -DzLib/CFLAGS += -DZ_HAVE_UNISTD_H=0 -DzLib/' SDDS/SDDSaps/pseudoInverse/Makefile
+fi
+
+# Work around macOS SDK conflict: zconf.h includes unistd.h which
+# re-declares swab/mknod/setkey already declared in other SDK headers,
+# causing "conflicting types" errors. Suppress the include globally.
+if [[ "$OS" == "Darwin" ]]; then
+  for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
+    sed -i'' -e '/^ifeq (\$(OS), Darwin)/,/^endif/{s/CFLAGS = /CFLAGS = -DZ_HAVE_UNISTD_H=0 /;}' "$rules_file"
+  done
 fi
 
 # --- Remove hardcoded gcc rule in sddsplots ---
