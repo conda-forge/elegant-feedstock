@@ -50,6 +50,9 @@ for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
   # Remove -mcpu=native for reproducible builds
   sed -i'' -e 's/-mcpu=native//g' "$rules_file"
 
+  # Upgrade C++ standard from c++11 to c++14 (Eigen requires it)
+  sed -i'' -e 's/-std=c++11/-std=c++14/g' "$rules_file"
+
   # Remove hardcoded system include paths — conda packages put headers in
   # $PREFIX/include which is already in EXTRA_INC_DIRS via library detection.
   sed -i'' -e 's|-I/usr/include/lapacke||g' "$rules_file"
