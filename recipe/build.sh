@@ -91,27 +91,30 @@ if [[ "$OS" == "Darwin" ]]; then
     sed -i'' -e "s|-framework Accelerate|-L${PREFIX}/lib -llapacke -llapack -lblas|" "$mf"
   done
 
-  # The pseudoInverse source files use `#if defined(__APPLE__)` to select
-  # Apple Accelerate calling conventions (__LAPACK_int, etc.). Since we're
-  # using openblas, not Accelerate, replace those guards so the standard
-  # (Linux-style) LAPACK code paths are used instead.
+  # Source files use `#if defined(__APPLE__)` to select Apple Accelerate
+  # calling conventions (__LAPACK_int, Accelerate.h, etc.). Since we're
+  # using openblas, not Accelerate, change those guards to also require
+  # CLAPACK (which is no longer defined), so the #else branches with
+  # standard LAPACK calling conventions are taken instead.
   for src in \
     SDDS/SDDSaps/pseudoInverse/matrix.c \
     SDDS/SDDSaps/pseudoInverse/sddspseudoinverse.c \
-    SDDS/SDDSaps/pseudoInverse/sddsica.c; do
-    # Change __APPLE__ guards to require CLAPACK too (which is no longer defined),
-    # so the #else branches with standard LAPACK calling conventions are taken.
+    SDDS/SDDSaps/pseudoInverse/sddsica.c \
+    elegant/src/matrixOp.c; do
     sed -i'' -e 's/defined(__APPLE__)/defined(__APPLE__) \&\& defined(CLAPACK)/g' "$src"
   done
 
 fi
 
 # Work around macOS SDK conflict: zconf.h includes unistd.h which
-# re-declares swab/mknod/setkey already declared in other SDK headers,
-# causing "conflicting types" errors. Suppress the include globally.
+# re-declares swab/mknod/setkey/getsubopt already declared in other SDK
+# headers, causing "conflicting types" errors. Force-include unistd.h
+# before anything else so the declarations are seen first and subsequent
+# includes become harmless no-ops (via header guards).
 if [[ "$OS" == "Darwin" ]]; then
   for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
-    sed -i'' -e '/^ifeq (\$(OS), Darwin)/,/^endif/{s/CFLAGS = /CFLAGS = -DZ_HAVE_UNISTD_H=0 /;}' "$rules_file"
+    sed -i'' -e '/^ifeq (\$(OS), Darwin)/,/^endif/{s/CFLAGS = /CFLAGS = -include unistd.h /;}' "$rules_file"
+    sed -i'' -e '/^ifeq (\$(OS), Darwin)/,/^endif/{s/CCFLAGS = /CCFLAGS = -include unistd.h /;}' "$rules_file"
   done
 fi
 
