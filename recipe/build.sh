@@ -36,13 +36,13 @@ for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
   sed -i'' -e "s|^  CC = gcc\$|  CC = ${CC}|" "$rules_file"
   sed -i'' -e "s|^  CCC = g++\$|  CCC = ${CXX}|" "$rules_file"
   sed -i'' -e "s|^  AR = ar rcs\$|  AR = ${AR} rcs|" "$rules_file"
-  sed -i'' -e "s|^  F77 = gfortran -m64 -ffixed-line-length-132\$|  F77 = ${FC} -m64 -ffixed-line-length-132|" "$rules_file"
+  sed -i'' -e "s|^  F77 = gfortran -m64 -ffixed-line-length-132\$|  F77 = ${FC} -m64 -ffixed-line-length-132 -L${PREFIX}/lib|" "$rules_file"
 
   # Replace compilers with conda toolchain (Darwin section)
   sed -i'' -e "s|^  CC = clang\$|  CC = ${CC}|" "$rules_file"
   sed -i'' -e "s|^  CCC = clang++\$|  CCC = ${CXX}|" "$rules_file"
   sed -i'' -e "s|^  AR = libtool -static -o\$|  AR = ${AR} rcs|" "$rules_file"
-  sed -i'' -e "s|^  F77 = gfortran-mp-14 -m64 -ffixed-line-length-132\$|  F77 = ${FC} -m64 -ffixed-line-length-132|" "$rules_file"
+  sed -i'' -e "s|^  F77 = gfortran-mp-14 -m64 -ffixed-line-length-132\$|  F77 = ${FC} -m64 -ffixed-line-length-132 -L${PREFIX}/lib|" "$rules_file"
 
   # Add headerpad for install_name_tool on macOS
   # Error was: (for architecture x86_64) because larger updated load commands
