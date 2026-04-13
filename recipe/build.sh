@@ -114,16 +114,23 @@ MAKE_ARGS=(
 # --- Cross-compilation handling ---
 
 if [[ "$CROSS_COMPILING" == "1" ]]; then
-  echo "* Phase 1: Building all of SDDS for the build machine ($ARCH)"
+  echo "* Phase 1: Building nlpp for the build machine ($ARCH)"
 
-  # nlpp is a code generator that must run on the build machine during the
-  # elegant build. Build the entire SDDS tree natively so nlpp (and all
-  # libraries it depends on) are available.
-  make -C SDDS -j"${CPU_COUNT}" \
-    "CC=${CC_FOR_BUILD}" \
-    "CCC=${CXX_FOR_BUILD}" \
-    "AR=$(which ar) rcs" \
-    "RANLIB=$(which ranlib)"
+  for dir in \
+    SDDS/include \
+    SDDS/meschach \
+    SDDS/xlslib \
+    SDDS/mdblib \
+    SDDS/mdbmth \
+    SDDS/rpns/code \
+    SDDS/namelist; do
+    echo "* Building $dir for build machine"
+    make -C "$dir" \
+      "CC=${CC_FOR_BUILD}" \
+      "CCC=${CXX_FOR_BUILD}" \
+      "AR=$(which ar) rcs" \
+      "RANLIB=$(which ranlib)"
+  done
 
   NLPP_NATIVE="SDDS/bin/${OS}-${ARCH}/nlpp"
   if [[ ! -f "$NLPP_NATIVE" ]]; then
