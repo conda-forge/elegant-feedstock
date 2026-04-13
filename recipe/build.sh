@@ -44,6 +44,12 @@ for rules_file in SDDS/Makefile.rules elegant/Makefile.rules; do
   sed -i'' -e "s|^  AR = libtool -static -o\$|  AR = ${AR} rcs|" "$rules_file"
   sed -i'' -e "s|^  F77 = gfortran-mp-14 -m64 -ffixed-line-length-132\$|  F77 = ${FC} -m64 -ffixed-line-length-132|" "$rules_file"
 
+  # Add headerpad for install_name_tool on macOS
+  # Error was: (for architecture x86_64) because larger updated load commands
+  # do not fit (the program must be relinked, and you may need to use
+  # -headerpad or -headerpad_max_install_names)
+  sed -i'' -e 's/LDFLAGS = \$(MAC_VERSION)/LDFLAGS = -Wl,-headerpad_max_install_names $(MAC_VERSION)/' "$rules_file"
+
   # Replace ranlib (same pattern in both sections)
   sed -i'' -e "s|^  RANLIB = ranlib\$|  RANLIB = ${RANLIB}|" "$rules_file"
 
