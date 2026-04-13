@@ -142,21 +142,35 @@ MAKE_ARGS=(
 if [[ "$CROSS_COMPILING" == "1" ]]; then
   echo "* Phase 1: Building nlpp for the build machine ($ARCH)"
 
+  # Build only libraries (not executables) for the nlpp dependency chain.
+  # rpns/code and namelist also build executables (rpn, nlpp) that link
+  # against external libs (gsl, zlib) — those are arm64 in $PREFIX and
+  # can't be linked by the native x86_64 compiler. So we build libraries
+  # first, then only the nlpp executable from namelist.
+  NATIVE_MAKE_ARGS=(
+    "CC=${CC_FOR_BUILD}"
+    "CCC=${CXX_FOR_BUILD}"
+    "AR=$(which ar) rcs"
+    "RANLIB=$(which ranlib)"
+  )
+
   for dir in \
     SDDS/include \
     SDDS/meschach \
     SDDS/xlslib \
     SDDS/mdblib \
-    SDDS/mdbmth \
-    SDDS/rpns/code \
-    SDDS/namelist; do
+    SDDS/mdbmth; do
     echo "* Building $dir for build machine"
-    make -C "$dir" \
-      "CC=${CC_FOR_BUILD}" \
-      "CCC=${CXX_FOR_BUILD}" \
-      "AR=$(which ar) rcs" \
-      "RANLIB=$(which ranlib)"
+    make -C "$dir" "${NATIVE_MAKE_ARGS[@]}"
   done
+
+  # rpns/code: build only the library, skip rpn/rpnl/if2pf executables
+  echo "* Building SDDS/rpns/code (library only) for build machine"
+  make -C SDDS/rpns/code "${NATIVE_MAKE_ARGS[@]}" PROD=""
+
+  # namelist: build library + nlpp executable (nlpp only links internal libs)
+  echo "* Building SDDS/namelist for build machine"
+  make -C SDDS/namelist "${NATIVE_MAKE_ARGS[@]}"
 
   NLPP_NATIVE="SDDS/bin/${OS}-${ARCH}/nlpp"
   if [[ ! -f "$NLPP_NATIVE" ]]; then
