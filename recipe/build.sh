@@ -103,6 +103,11 @@ if [[ "$OS" == "Darwin" ]]; then
     # so the #else branches with standard LAPACK calling conventions are taken.
     sed -i'' -e 's/defined(__APPLE__)/defined(__APPLE__) \&\& defined(CLAPACK)/g' "$src"
   done
+
+  # Work around macOS SDK conflict: zconf.h includes unistd.h which
+  # re-declares swab/mknod/setkey already declared in other SDK headers,
+  # causing "conflicting types" errors. Suppress the include.
+  sed -i'' -e 's/^CFLAGS += -DzLib/CFLAGS += -DZ_HAVE_UNISTD_H=0 -DzLib/' SDDS/SDDSaps/pseudoInverse/Makefile
 fi
 
 # --- Remove hardcoded gcc rule in sddsplots ---
