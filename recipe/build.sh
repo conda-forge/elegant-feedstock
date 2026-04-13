@@ -156,6 +156,7 @@ export OMPI_CXX="$CXX"
 MAKE_ARGS=(
   "MPI_CC=mpicc"
   "MPI_CCC=mpicxx"
+  "SVN_VERSION=${PKG_VERSION}"
 )
 
 # --- Cross-compilation handling ---
