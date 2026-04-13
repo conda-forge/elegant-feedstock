@@ -91,15 +91,17 @@ if [[ "$OS" == "Darwin" ]]; then
     sed -i'' -e "s|-framework Accelerate|-L${PREFIX}/lib -llapacke -llapack -lblas|" "$mf"
   done
 
-  # The pseudoInverse source files unconditionally include Accelerate/Accelerate.h
-  # on __APPLE__, which conflicts with openblas's lapacke.h. Remove those blocks.
+  # The pseudoInverse source files use `#if defined(__APPLE__)` to select
+  # Apple Accelerate calling conventions (__LAPACK_int, etc.). Since we're
+  # using openblas, not Accelerate, replace those guards so the standard
+  # (Linux-style) LAPACK code paths are used instead.
   for src in \
     SDDS/SDDSaps/pseudoInverse/matrix.c \
     SDDS/SDDSaps/pseudoInverse/sddspseudoinverse.c \
     SDDS/SDDSaps/pseudoInverse/sddsica.c; do
-    # Delete the ACCELERATE_NEW_LAPACK and Accelerate.h lines from within
-    # the #if defined(__APPLE__) ... #endif block near the top of each file.
-    sed -i'' -e '/#if defined(__APPLE__)/,/#endif/{/ACCELERATE_NEW_LAPACK/d;/Accelerate\/Accelerate/d;}' "$src"
+    # Change __APPLE__ guards to require CLAPACK too (which is no longer defined),
+    # so the #else branches with standard LAPACK calling conventions are taken.
+    sed -i'' -e 's/defined(__APPLE__)/defined(__APPLE__) \&\& defined(CLAPACK)/g' "$src"
   done
 fi
 
