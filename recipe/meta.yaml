@@ -50,11 +50,17 @@ requirements:
     - libtiff
     - zlib
     - zstd  # [osx]
+    # tiff transitive deps directly linked on macOS:
+    - lerc  # [osx]
+    - libdeflate  # [osx]
+    - libjpeg-turbo  # [osx]
     - {{ mpi }}
     - liblapack
     - liblapacke
     - libblas
     - openblas
+    # Fortran runtime directly linked on macOS:
+    - libgfortran  # [osx]
   run:
     - {{ mpi }}
     - libblas * *openblas
