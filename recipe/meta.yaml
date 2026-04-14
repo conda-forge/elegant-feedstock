@@ -27,8 +27,7 @@ build:
   run_exports:
     - {{ name }} * mpi_{{ mpi }}_*
   ignore_run_exports:
-    - libaec
-    - zstd  # [osx]
+    - libaec  # [linux]
 
 requirements:
   build:
@@ -50,6 +49,7 @@ requirements:
     - libpng
     - libtiff
     - zlib
+    - zstd  # [osx]
     - {{ mpi }}
     - liblapack
     - liblapacke
@@ -59,6 +59,7 @@ requirements:
     - {{ mpi }}
     - libblas * *openblas
     - libcblas * *openblas
+    - zstd  # [osx]
     - openblas
 
 test:
