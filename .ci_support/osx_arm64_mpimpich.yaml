@@ -24,10 +24,16 @@ fortran_compiler_version:
 - '14'
 gsl:
 - '2.7'
+lerc:
+- '4'
 libaec:
 - '1'
 libblas:
 - 3.9.* *netlib
+libdeflate:
+- '1.25'
+libjpeg_turbo:
+- '3'
 liblapack:
 - 3.9.* *netlib
 liblapacke:
