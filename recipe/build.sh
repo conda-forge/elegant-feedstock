@@ -147,11 +147,15 @@ sed -i'' -e '/gcc -m64 -O0/d' SDDS/SDDSaps/sddsplots/Makefile
 
 sed -i'' -e 's|-I/usr/include/hdf5/serial||g' SDDS/utils/Makefile
 
-# --- Remove -Bstatic/-static-libgcc from elegant MPI Makefile ---
-# We want dynamic linking
+# --- Fix elegant MPI Makefile linker flags ---
+# Remove -Bstatic/-static-libgcc (we want dynamic linking), and add
+# --as-needed so the linker doesn't pull in libfabric (a mpich runtime
+# dependency that Pelegant doesn't directly use, and whose reference to
+# getrandom@GLIBC_2.25 causes link failures on conda-forge's sysroot).
 
 sed -i'' -e 's/-Bstatic //g' elegant/src/Makefile.mpi
 sed -i'' -e 's/-static-libgcc //g' elegant/src/Makefile.mpi
+sed -i'' -e 's/-fopenmp/-fopenmp -Wl,--as-needed/' elegant/src/Makefile.mpi
 
 # --- Set MPI environment ---
 
