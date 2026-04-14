@@ -67,6 +67,9 @@ requirements:
     - libcblas * *openblas
     - zstd  # [osx]
     - openblas
+    # Saw this overlinker error in cppbmad-feedstock, too - this is due to
+    # gfortran, and only on macos:
+    - libgcc     # [osx]
 
 test:
   commands:
