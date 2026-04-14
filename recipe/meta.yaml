@@ -36,6 +36,8 @@ requirements:
     - {{ compiler("cxx") }}
     - {{ compiler("fortran") }}
     - {{ mpi }}
+    # TODO: v2.5.1 libfabric complaining about getrandom/glibc 2.25
+    - libfabric <2.5.1  # [linux and mpi == "mpich"]
     - make
   host:
     - eigen
