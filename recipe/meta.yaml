@@ -1,5 +1,5 @@
 {% set name = "elegant" %}
-{% set version = "2026.1.0" %}
+{% set version = "2026.2.0" %}
 {% set sdds_version = "5.10" %}
 {% set build = 0 %}
 
@@ -9,7 +9,7 @@ package:
 
 source:
   - url: https://github.com/rtsoliday/elegant/archive/refs/tags/elegant-{{ version }}.tar.gz
-    sha256: 6464d74a178bdd4ffb7cbf452bdc5e8fa384a3dcc0740bf443500b945704a96c
+    sha256: 2dfd1db8fe938b7e76b471e1aad2ce27627933e344b831ee9d2fbc5f5174b3ef
     folder: elegant
   # TODO: this should be split to a separate feedstock now...
   - url: https://github.com/rtsoliday/SDDS/archive/refs/tags/SDDS-{{ sdds_version }}.tar.gz

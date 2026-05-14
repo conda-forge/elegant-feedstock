@@ -75,6 +75,11 @@ if [[ "$TARGET_ARCH" != "x86_64" ]]; then
   done
 fi
 
+# --- Fix parallel-build race on OBJ_DIR creation ---
+for mf in SDDS/Makefile.build elegant/Makefile.build; do
+  sed -i'' -e 's|^	mkdir \$(OBJ_DIR)$|	mkdir -p $(OBJ_DIR)|' "$mf"
+done
+
 # --- Stub out vendored libraries (use conda-forge packages instead) ---
 
 for dir in SDDS/png SDDS/gd SDDS/tiff SDDS/zlib SDDS/lzma; do
