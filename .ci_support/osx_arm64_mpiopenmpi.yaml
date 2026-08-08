@@ -23,7 +23,7 @@ fortran_compiler:
 fortran_compiler_version:
 - '14'
 gsl:
-- '2.7'
+- '2.8'
 lerc:
 - '4'
 libaec:
