@@ -1,11 +1,9 @@
-MACOSX_DEPLOYMENT_TARGET:
-- '11.0'
 MACOSX_SDK_VERSION:
 - '11.0'
 c_compiler:
 - clang
 c_compiler_version:
-- '19'
+- '21'
 c_stdlib:
 - macosx_deployment_target
 c_stdlib_version:
@@ -17,11 +15,11 @@ channel_targets:
 cxx_compiler:
 - clangxx
 cxx_compiler_version:
-- '19'
+- '21'
 fortran_compiler:
 - gfortran
 fortran_compiler_version:
-- '14'
+- '15'
 gsl:
 - '2.7'
 lerc:
@@ -31,7 +29,7 @@ libaec:
 libblas:
 - 3.9.* *netlib
 libdeflate:
-- '1.25'
+- '1.26'
 libjpeg_turbo:
 - '3'
 liblapack:
